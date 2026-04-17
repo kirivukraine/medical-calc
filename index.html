@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Калькулятор доз</title>
+    <meta name="author" content="Іван Кіранчук">
+
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Дози">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    
+    <link rel="manifest" href="manifest.json">
+
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            padding-top: env(safe-area-inset-top); 
+        }
+        .container { max-width: 800px; margin: 0 auto; background: white; border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); overflow: hidden; display: flex; flex-direction: column; }
+        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; }
+        .content { padding: 30px; flex-grow: 1; }
+        
+        .drug-selector { display: flex; gap: 10px; padding: 20px; background: #f8f9fa; flex-wrap: wrap; justify-content: center; }
+        .drug-btn { padding: 12px 20px; border: none; border-radius: 10px; cursor: pointer; font-size: 14px; font-weight: bold; color: white; transition: 0.3s; opacity: 0.6; }
+        .drug-btn.active { opacity: 1; transform: scale(1.05); box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
+        
+        .input-group { margin-bottom: 25px; transition: 0.3s; }
+        label { display: block; margin-bottom: 8px; font-weight: 600; color: #333; font-size: 14px; }
+        input { width: 100%; padding: 12px 15px; border: 2px solid #e0e0e0; border-radius: 10px; font-size: 16px; outline: none; }
+        input:focus { border-color: #667eea; }
+        
+        .calculate-btn { width: 100%; padding: 15px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 10px; font-size: 18px; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        .calculate-btn:active { transform: scale(0.98); }
+        
+        .result { margin-top: 30px; padding: 20px; background: #f8f9fa; border-radius: 15px; text-align: center; min-height: 120px; }
+        .result-value { font-size: 36px; font-weight: bold; color: #667eea; margin-bottom: 10px; }
+        .result-details { font-size: 14px; color: #666; white-space: pre-line; line-height: 1.5; }
+        
+        .footer { padding: 15px; text-align: center; font-size: 12px; color: #888; background: #f8f9fa; border-top: 1px solid #eee; }
+        .hidden { display: none; opacity: 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>💉 Калькулятор доз</h1>
+            <p>Швидкість інфузії (мл/год)</p>
+        </div>
+
+        <div class="drug-selector" id="drugSelector">
+            <button class="drug-btn active" style="background: #CD5C5C;" data-drug="dopamine">💓 Допамін</button>
+            <button class="drug-btn" style="background: #4682B4;" data-drug="norepinephrine">💙 Норадреналін</button>
+            <button class="drug-btn" style="background: #3CB371;" data-drug="dobutamine">💚 Добутамін</button>
+            <button class="drug-btn" style="background: #DAA520;" data-drug="insulin">🟡 Інсулін</button>
+            <button class="drug-btn" style="background: #9370DB;" data-drug="heparin">🟣 Гепарин</button>
+        </div>
+
+        <div class="content">
+            <div class="input-group">
+                <label id="labelAmount">📦 Кількість препарату (мг)</label>
+                <input type="number" id="drugAmount" value="200" step="any">
+            </div>
+            <div class="input-group">
+                <label>💧 Об'єм розчинника (мл)</label>
+                <input type="number" id="volume" value="50" step="any">
+            </div>
+            <div class="input-group" id="weightGroup">
+                <label>⚖️ Вага пацієнта (кг)</label>
+                <input type="number" id="weight" value="70" step="any">
+            </div>
+            <div class="input-group">
+                <label id="labelDose">💊 Потрібна доза (мкг/кг/хв)</label>
+                <input type="number" id="dose" value="5" step="any">
+            </div>
+            <button class="calculate-btn" onclick="calculate()">РОЗРАХУВАТИ</button>
+
+            <div class="result" id="result">
+                <div class="result-value" id="resultValue">--.-- мл/год</div>
+                <div class="result-details" id="resultDetails"></div>
+            </div>
+        </div>
+
+        <div class="footer">
+            Автор: Іван Кіранчук
+        </div>
+    </div>
+
+    <script>
+        let currentDrug = 'dopamine';
+
+        // Логіка перемикання препаратів
+        document.querySelectorAll('.drug-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                // Візуальне перемикання кнопок
+                document.querySelectorAll('.drug-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                
+                currentDrug = this.dataset.drug;
+                updateUI();
+            });
+        });
+
+        function updateUI() {
+            const weightGroup = document.getElementById('weightGroup');
+            const labelAmount = document.getElementById('labelAmount');
+            const labelDose = document.getElementById('labelDose');
+            const drugAmount = document.getElementById('drugAmount');
+            const dose = document.getElementById('dose');
+
+            if (currentDrug === 'insulin' || currentDrug === 'heparin') {
+                weightGroup.classList.add('hidden');
+                labelAmount.innerText = "📦 Кількість препарату (ОД)";
+                labelDose.innerText = currentDrug === 'insulin' ? "💊 Потрібна доза (ОД/год)" : "💊 Потрібна доза (МО/год)";
+                
+                // Значення за замовчуванням для інсуліну/гепарину
+                if (currentDrug === 'insulin') {
+                    drugAmount.value = 50;
+                    dose.value = 4;
+                } else {
+                    drugAmount.value = 25000;
+                    dose.value = 1000;
+                }
+            } else {
+                weightGroup.classList.remove('hidden');
+                labelAmount.innerText = "📦 Кількість препарату (мг)";
+                labelDose.innerText = "💊 Потрібна доза (мкг/кг/хв)";
+                
+                // Значення за замовчуванням для інотропів
+                drugAmount.value = currentDrug === 'norepinephrine' ? 8 : 200;
+                dose.value = currentDrug === 'norepinephrine' ? 0.1 : 5;
+            }
+            
+            // Скидання результату
+            document.getElementById('resultValue').innerText = "--.-- мл/год";
+            document.getElementById('resultDetails').innerText = "";
+        }
+
+        function calculate() {
+            const amount = parseFloat(document.getElementById('drugAmount').value);
+            const vol = parseFloat(document.getElementById('volume').value);
+            const weight = parseFloat(document.getElementById('weight').value);
+            const dose = parseFloat(document.getElementById('dose').value);
+
+            if (!amount || !vol || !dose || (currentDrug !== 'insulin' && currentDrug !== 'heparin' && !weight)) {
+                alert("Будь ласка, заповніть усі дані");
+                return;
+            }
+
+            let rate = 0;
+            let concentration = 0;
+            let info = "";
+
+            if (currentDrug === 'dopamine' || currentDrug === 'norepinephrine' || currentDrug === 'dobutamine') {
+                // Розрахунок для мкг/кг/хв
+                concentration = (amount * 1000) / vol; // мкг в 1 мл
+                rate = (dose * weight * 60) / concentration;
+                info = `Концентрація: ${concentration.toFixed(1)} мкг/мл\nЦільова доза: ${dose} мкг/кг/хв`;
+            } else {
+                // Розрахунок для ОД/год або МО/год
+                concentration = amount / vol; // ОД в 1 мл
+                rate = dose / concentration;
+                const unit = currentDrug === 'insulin' ? 'ОД' : 'МО';
+                info = `Концентрація: ${concentration.toFixed(1)} ${unit}/мл\nЦільова доза: ${dose} ${unit}/год`;
+            }
+
+            document.getElementById('resultValue').innerText = rate.toFixed(2) + " мл/год";
+            document.getElementById('resultDetails').innerText = info;
+        }
+
+        // Реєстрація Service Worker (якщо файл sw.js створено)
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js').catch(() => {});
+            });
+        }
+    </script>
+</body>
+</html>

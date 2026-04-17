@@ -1,0 +1,16 @@
+{
+  "name": "Калькулятор Доз Інфузії",
+  "short_name": "Дози",
+  "description": "Медичний калькулятор. Автор: Іван Кіранчук",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#764ba2",
+  "theme_color": "#764ba2",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    }
+  ]
+}
